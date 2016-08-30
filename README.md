@@ -1,6 +1,7 @@
 Modifications
 ====
-I need to make sure to terminate actor objects because of deleteing actor object
+I need to make sure to terminate actor objects because of deleteing actor object.
+Furthermore, I want to call function(not interface of struct).
 
 GLAM
 ====
@@ -77,7 +78,8 @@ func main() {
      // herp derp
      book := Phonebook{glam.Actor{}, make(map[string]int)}
      book.StartActor(&book)  // Call this before calling "Call"
-     book.Call((*Phonebook).Lookup, "Jane")[0].Int()
+     book.CallStruct((*Phonebook).Lookup, "Jane")[0].Int()
+     book.CallFunction( func() int{ return 1 } )[0].Int()
      book.TerminateActor( true )
 }
 ```

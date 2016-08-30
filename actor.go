@@ -26,11 +26,9 @@ func (r *Actor) TerminateActor(sync bool) {
 	return
 }
 
-// Synchronously invoke function in the actor's own thread, passing args. Returns the
-// result of execution.
-func (r *Actor) Call(function interface{}, args ...interface{}) []interface{} {
+func (r *Actor) CallFunction(function interface{}) []interface{} {
 	out := make(chan Response, 0)
-	r.Cast(out, function, args...)
+	r.Cast(out, false, function)
 	response := <-out
 
 	return response.InterpretAsInterfaces()
@@ -38,7 +36,29 @@ func (r *Actor) Call(function interface{}, args ...interface{}) []interface{} {
 
 // Internal method to verify that the given function can be invoked on the actor's
 // receiver with the given args.
-func (r *Actor) verifyCallSignature(function interface{}, args []interface{}) {
+func (r *Actor) verifyCallFunctionSignature(function interface{}) {
+	typ := reflect.TypeOf(function)
+	if typ.Kind() != reflect.Func {
+		panic("Function is not a method!")
+	}
+	if typ.NumIn() != 0 {
+		panic("Casted method must have no receiver!")
+	}
+}
+
+// Synchronously invoke function in the actor's own thread, passing args. Returns the
+// result of execution.
+func (r *Actor) CallStruct(function interface{}, args ...interface{}) []interface{} {
+	out := make(chan Response, 0)
+	r.Cast(out, true, function, args...)
+	response := <-out
+
+	return response.InterpretAsInterfaces()
+}
+
+// Internal method to verify that the given function can be invoked on the actor's
+// receiver with the given args.
+func (r *Actor) verifyCallStructSignature(function interface{}, args []interface{}) {
 	typ := reflect.TypeOf(function)
 	if typ.Kind() != reflect.Func {
 		panic("Function is not a method!")
@@ -68,22 +88,35 @@ func (r *Actor) verifyCallSignature(function interface{}, args []interface{}) {
 }
 
 // Asynchronously request that the given function be invoked with the given args.
-func (r *Actor) Cast(out chan<- Response, function interface{}, args ...interface{}) {
-	r.verifyCallSignature(function, args)
-	r.runInThread(out, r.Receiver, function, args...)
+func (r *Actor) Cast(out chan<- Response, isstruct bool, function interface{}, args ...interface{}) {
+	if isstruct {
+		r.verifyCallStructSignature(function, args)
+		r.runInThread(out, true, r.Receiver, function, args...)
+	} else {
+		r.verifyCallFunctionSignature(function)
+		r.runInThread(out, false, r.Receiver, function, args...)
+	}
 }
 
-func (r *Actor) runInThread(out chan<- Response, receiver reflect.Value, function interface{}, args ...interface{}) {
+func (r *Actor) runInThread(out chan<- Response, isstruct bool, receiver reflect.Value, function interface{}, args ...interface{}) {
 	if r.Q == nil {
 		panic("Call StartActor before sending it messages!")
 	}
 
-	// reflect.Call expects the arguments to be a slice of reflect.Values. We also
-	// need to ensure that the 0th argument is the receiving struct.
-	valuedArgs := make([]reflect.Value, len(args)+1)
-	valuedArgs[0] = receiver
-	for i, x := range args {
-		valuedArgs[i+1] = reflect.ValueOf(x)
+	var valuedArgs []reflect.Value
+	if isstruct {
+		// reflect.Call expects the arguments to be a slice of reflect.Values. We also
+		// need to ensure that the 0th argument is the receiving struct.
+		valuedArgs = make([]reflect.Value, len(args)+1)
+		valuedArgs[0] = receiver
+		for i, x := range args {
+			valuedArgs[i+1] = reflect.ValueOf(x)
+		}
+	} else {
+		valuedArgs = make([]reflect.Value, len(args))
+		for i, x := range args {
+			valuedArgs[i] = reflect.ValueOf(x)
+		}
 	}
 
 	r.Q.In <- Request{reflect.ValueOf(function), valuedArgs, out}
@@ -129,7 +162,8 @@ func guardedExec(function reflect.Value, args []reflect.Value) (response Respons
 		}
 	}()
 
-	result := function.Call(args)
+	var result []reflect.Value
+	result = function.Call(args)
 	response = ResponseImpl{result: result, err: nil, panicked: false}
 	return
 }
@@ -149,13 +183,16 @@ func (r *Actor) StartActor(receiver interface{}) {
 	r.Q = NewMessageQueue(kActorQueueLength)
 	r.Receiver = reflect.ValueOf(receiver)
 	go func() {
-		select {
-		case request := <-r.Q.Out:
-			r.processOneRequest(request)
-		case <-r.Terminate:
-			r.WaitStopSignal <- true
-			return
+		for {
+			select {
+			case request := <-r.Q.Out:
+				r.processOneRequest(request)
+			case <-r.Terminate:
+				r.WaitStopSignal <- true
+				return
+			}
 		}
+		fmt.Printf("Terminted Actor\n")
 	}()
 }
 

@@ -1,20 +1,21 @@
-package glam;
+package glam
 
-import(
+import (
 	"reflect"
 )
 
 type RetryBehavior int32
-const(
+
+const (
 	kRetryNever = iota
 	kRetryAlways
 )
 
 type Cache struct {
-	cache map[string]interface{}
-	pending map[string]*PendingCacheEntry
+	cache         map[string]interface{}
+	pending       map[string]*PendingCacheEntry
 	retryBehavior RetryBehavior
-	actor *Actor
+	actor         *Actor
 }
 
 func NewCache(actor *Actor, retryBehavior RetryBehavior) Cache {
@@ -56,24 +57,24 @@ type Promise interface {
 }
 
 type PendingCacheEntry struct {
-	key string
+	key      string
 	watchers []Watcher
-  cache *Cache
+	cache    *Cache
 }
 
 func newPendingCacheEntry(c *Cache) *PendingCacheEntry {
-	return &PendingCacheEntry{cache: c, watchers: make([]Watcher,0,5)}
+	return &PendingCacheEntry{cache: c, watchers: make([]Watcher, 0, 5)}
 }
 
 func (p *PendingCacheEntry) addWatcher() Future {
 	watcher := newWatcher()
 	p.watchers = append(p.watchers, watcher)
-	return &p.watchers[len(p.watchers) - 1]
+	return &p.watchers[len(p.watchers)-1]
 }
 
 func (e *PendingCacheEntry) Fulfill(x interface{}) {
 	e.cache.actor.runInThread(
-		nil, reflect.ValueOf(e), (*PendingCacheEntry).notifyListeners, x)
+		nil, true, reflect.ValueOf(e), (*PendingCacheEntry).notifyListeners, x)
 }
 
 func (e *PendingCacheEntry) notifyListeners(x interface{}) {
@@ -85,9 +86,9 @@ func (e *PendingCacheEntry) notifyListeners(x interface{}) {
 }
 
 type Watcher struct {
-	out chan interface{}
+	out    chan interface{}
 	worker interface{}
-	args []interface{}
+	args   []interface{}
 }
 
 type Future interface {
@@ -99,7 +100,7 @@ func newWatcher() Watcher {
 }
 
 func (w *Watcher) Get() interface{} {
-	x := <- w.out
+	x := <-w.out
 	w.out <- x
 	return x
 }

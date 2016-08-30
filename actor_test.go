@@ -1,6 +1,7 @@
 package glam
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -55,23 +56,36 @@ func (a A) LongTricks(x int) int {
 	return x + 5
 }
 
-func TestGetX(t *testing.T) {
+func TestSimpleCallFunction(t *testing.T) {
+	fmt.Printf("TestSimpleCallFunction\n")
+	var x int
 	a := A{2, 3, nil, Actor{}}
 	a.StartActor(a)
 
-	if x := a.Call(A.GetX, 4)[0].(int); x != 6 {
+	if x := a.CallFunction(func() int { x = 6; return x })[0].(int); x != 6 {
+		t.Errorf("Expected x = %v, actual %v\n", 6, x)
+	}
+}
+
+func TestGetX(t *testing.T) {
+	fmt.Printf("TestGetX\n")
+	a := A{2, 3, nil, Actor{}}
+	a.StartActor(a)
+
+	if x := a.CallStruct(A.GetX, 4)[0].(int); x != 6 {
 		t.Errorf("Expected x = %v, actual %v\n", 6, x)
 	}
 }
 
 func TestPanic(t *testing.T) {
+	fmt.Printf("TestPanic\n")
 	a := A{2, 3, nil, Actor{}}
 	a.StartActor(a)
 
 	defer func() {
 		if e := recover(); e != nil {
 			if response, ok := e.(Response); ok {
-				if panicCause, ok2 := response.PanicCause().(int); (!ok2 || panicCause != 3) {
+				if panicCause, ok2 := response.PanicCause().(int); !ok2 || panicCause != 3 {
 					t.Errorf("Expected to receive panic response == 3, actual %v\n", panicCause)
 				}
 			} else {
@@ -80,13 +94,14 @@ func TestPanic(t *testing.T) {
 		}
 	}()
 
-	a.Call(A.DoPanic)
+	a.CallStruct(A.DoPanic)
 }
 
 func TestDefer(t *testing.T) {
+	fmt.Printf("TestDefer\n")
 	a := A{3, 4, nil, Actor{}}
 	a.StartActor(&a)
-	if val := a.Call((*A).Tricks)[0].(int); val != 8 {
+	if val := a.CallStruct((*A).Tricks)[0].(int); val != 8 {
 		t.Errorf("Expected returning x+5, actual %v\n", val)
 	}
 }
@@ -97,7 +112,7 @@ func BenchmarkActor(b *testing.B) {
 	a.StartActor(a)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		a.Call(A.GetX, 3)
+		a.CallStruct(A.GetX, 3)
 	}
 }
 
@@ -117,6 +132,6 @@ func BenchmarkDeferred(b *testing.B) {
 	a.StartActor(&a)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		a.Call((*A).Tricks)
+		a.CallStruct((*A).Tricks)
 	}
 }
