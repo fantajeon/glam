@@ -8,13 +8,23 @@ import (
 
 // Internal state needed by the Actor.
 type Actor struct {
-	Q *MessageQueue
-	Receiver reflect.Value
-	Deferred bool
-	Current chan<- Response
+	Q              *MessageQueue
+	Receiver       reflect.Value
+	Deferred       bool
+	Current        chan<- Response
+	Terminate      chan bool
+	WaitStopSignal chan bool
 }
 
 const kActorQueueLength int = 1
+
+func (r *Actor) TerminateActor(sync bool) {
+	r.Terminate <- true
+	if sync {
+		<-r.WaitStopSignal
+	}
+	return
+}
 
 // Synchronously invoke function in the actor's own thread, passing args. Returns the
 // result of execution.
@@ -52,7 +62,7 @@ func (r *Actor) verifyCallSignature(function interface{}, args []interface{}) {
 	for i := 1; i < typ.NumIn(); i++ {
 		if argType := reflect.TypeOf(args[i-1]); !argType.AssignableTo(typ.In(i)) {
 			panic(
-				fmt.Sprintf("Cannot assign arg %d (%s -> %s)", i - 1, argType, typ.In(i)))
+				fmt.Sprintf("Cannot assign arg %d (%s -> %s)", i-1, argType, typ.In(i)))
 		}
 	}
 }
@@ -139,9 +149,12 @@ func (r *Actor) StartActor(receiver interface{}) {
 	r.Q = NewMessageQueue(kActorQueueLength)
 	r.Receiver = reflect.ValueOf(receiver)
 	go func() {
-		for {
-			request := <-r.Q.Out
+		select {
+		case request := <-r.Q.Out:
 			r.processOneRequest(request)
+		case <-r.Terminate:
+			r.WaitStopSignal <- true
+			return
 		}
 	}()
 }
