@@ -1,6 +1,6 @@
 Modifications
 ====
-I need to make sure to terminate actor because of clearning actor object
+I need to make sure to terminate actor objects because of deleteing actor object
 
 GLAM
 ====
