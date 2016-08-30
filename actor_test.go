@@ -65,6 +65,7 @@ func TestSimpleCallFunction(t *testing.T) {
 	if x := a.CallFunction(func() int { x = 6; return x })[0].(int); x != 6 {
 		t.Errorf("Expected x = %v, actual %v\n", 6, x)
 	}
+	a.TerminateActor(true)
 }
 
 func TestGetX(t *testing.T) {

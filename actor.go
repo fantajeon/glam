@@ -180,6 +180,8 @@ func (r *Actor) processOneRequest(request Request) {
 // Start the internal goroutine that powers this actor. Call this function
 // before calling Do on this object.
 func (r *Actor) StartActor(receiver interface{}) {
+	r.Terminate = make(chan bool, 1)
+	r.WaitStopSignal = make(chan bool, 1)
 	r.Q = NewMessageQueue(kActorQueueLength)
 	r.Receiver = reflect.ValueOf(receiver)
 	go func() {
