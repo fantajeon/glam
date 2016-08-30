@@ -1,3 +1,7 @@
+Modifications
+====
+I need to make sure to terminate actor because of clearning actor object
+
 GLAM
 ====
 (GoLang Actor Model)
