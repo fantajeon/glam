@@ -78,18 +78,7 @@ func main() {
      book := Phonebook{glam.Actor{}, make(map[string]int)}
      book.StartActor(&book)  // Call this before calling "Call"
      book.Call((*Phonebook).Lookup, "Jane")[0].Int()
+     book.TerminateActor( true )
 }
 ```
 
-Performance
-===========
-
-The tests include a benchmark. On my 2008 MBP: (note these are preliminary, need to look into the channel one)
-
-```
-glam_test.BenchmarkActor	  500000	      5577 ns/op
-glam_test.BenchmarkChannel	 1000000	      1042 ns/op
-glam_test.BenchmarkDeferred	  200000	      8022 ns/op
-```
-
-So it's about 5.5x worse for trivial functions. No testing has been done against large numbers of arguments or situations where function calls may block.
