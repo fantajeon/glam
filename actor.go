@@ -25,7 +25,7 @@ func NewActor() Actor {
 	return r
 }
 
-func (r *Actor) AttachReceive(receiver interface{}) {
+func (r *Actor) AttachReceiver(receiver interface{}) {
 	r.Receiver = reflect.ValueOf(receiver)
 	r.ReceiverValid = true
 }
