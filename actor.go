@@ -19,8 +19,8 @@ type Actor struct {
 
 const kActorQueueLength int = 1
 
-func NewActor() *Actor {
-	r := &Actor{}
+func NewActor() Actor {
+	r := Actor{}
 	r.StartActor()
 	return r
 }
