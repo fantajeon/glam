@@ -9,6 +9,7 @@ import (
 // Internal state needed by the Actor.
 type Actor struct {
 	Q              *MessageQueue
+	ReceiverValid  bool
 	Receiver       reflect.Value
 	Deferred       bool
 	Current        chan<- Response
@@ -17,6 +18,17 @@ type Actor struct {
 }
 
 const kActorQueueLength int = 1
+
+func NewActor() *Actor {
+	r := &Actor{}
+	r.StartActor()
+	return r
+}
+
+func (r *Actor) AttachReceive(receiver interface{}) {
+	r.Receiver = reflect.ValueOf(receiver)
+	r.ReceiverValid = true
+}
 
 func (r *Actor) TerminateActor(sync bool) {
 	r.Terminate <- true
@@ -49,11 +61,15 @@ func (r *Actor) verifyCallFunctionSignature(function interface{}) {
 // Synchronously invoke function in the actor's own thread, passing args. Returns the
 // result of execution.
 func (r *Actor) CallStruct(function interface{}, args ...interface{}) []interface{} {
-	out := make(chan Response, 0)
-	r.Cast(out, true, function, args...)
-	response := <-out
+	if r.ReceiverValid {
+		out := make(chan Response, 0)
+		r.Cast(out, true, function, args...)
+		response := <-out
 
-	return response.InterpretAsInterfaces()
+		return response.InterpretAsInterfaces()
+	} else {
+		panic("Receiver is not validated ")
+	}
 }
 
 // Internal method to verify that the given function can be invoked on the actor's
@@ -179,11 +195,10 @@ func (r *Actor) processOneRequest(request Request) {
 
 // Start the internal goroutine that powers this actor. Call this function
 // before calling Do on this object.
-func (r *Actor) StartActor(receiver interface{}) {
+func (r *Actor) StartActor() {
 	r.Terminate = make(chan bool, 1)
 	r.WaitStopSignal = make(chan bool, 1)
 	r.Q = NewMessageQueue(kActorQueueLength)
-	r.Receiver = reflect.ValueOf(receiver)
 	go func() {
 		for {
 			select {
